@@ -1,5 +1,12 @@
+import hj_reachability as hj
+import hj_reachability.shapes as shp
+import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+
+def compute_brs(solver_settings, dynamics, grid, target, t):
+    values = hj.step(solver_settings, dynamics, grid, 0., target, -t)
+    return np.asarray(values)
 
 def plot_set_3D(x, y, z, val, axes_titles=("x", "y", "z")):
     layout = go.Layout(

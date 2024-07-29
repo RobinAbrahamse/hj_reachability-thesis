@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 # import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+from hj_tools import compute_brs
 
 avoid_dynamics = hj.systems.Bicycle7D(min_controls=[-26, -3.6],
                                       max_controls=[+26, +3.6]).with_mode('avoid')
@@ -16,10 +17,6 @@ grid = hj.Grid.from_lattice_parameters_and_boundary_conditions(hj.sets.Box(min_b
 
 solver_settings = hj.SolverSettings.with_accuracy("low")
 t_step = .1
-
-def compute_brs(solver_settings, dynamics, grid, target, t):
-    values = hj.step(solver_settings, dynamics, grid, 0., target, -t)
-    return np.asarray(values)
 
 target = shp.intersection(shp.lower_half_space(grid, 0, +6.),
                           shp.upper_half_space(grid, 0, -6.),

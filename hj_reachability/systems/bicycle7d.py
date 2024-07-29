@@ -435,6 +435,7 @@ class X_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
         ])
 
     def disturbance_jacobian(self, state, time):
+        # disturbance: v_x, v_y, w
         x, yaw = state
         return jnp.array([
             [jnp.cos(yaw), -jnp.sin(yaw), 0.],
