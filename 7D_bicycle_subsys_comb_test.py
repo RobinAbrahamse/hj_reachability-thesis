@@ -146,43 +146,38 @@ x_yaw_sel = (x_yaw_result[:,2] + x_yaw_result[:,3]*2)/3.
 y_yaw_sel = (y_yaw_result[:,2] + y_yaw_result[:,3]*2)/3.
 yaw_w_sel = (yaw_w_result[2,3] + yaw_w_result[3,3]*2)/3.
 
-x_yaw_t = np.repeat(x_yaw_sel[:,np.newaxis], y_yaw.grid.shape[0], axis=1)
-y_yaw_t = np.repeat(y_yaw_sel[np.newaxis,:], x_yaw.grid.shape[0], axis=0)
-x_y_yaw_sel = np.maximum(x_yaw_t, y_yaw_t)
-
-plt.figure(figsize=(13, 8))
-plt.contourf(x_yaw.grid.coordinate_vectors[0], y_yaw.grid.coordinate_vectors[0], x_y_yaw_sel[:, :].T, levels=[-1e3, 0., 1e3])
-plt.colorbar()
-plt.xlabel('x')
-plt.ylabel('y')
-plt.show()
+x_yaw_sel = np.repeat(x_yaw_sel[:,np.newaxis], y_yaw.grid.shape[0], axis=1)
+y_yaw_sel = np.repeat(y_yaw_sel[np.newaxis,:], x_yaw.grid.shape[0], axis=0)
+x_y_yaw_sel = np.maximum(x_yaw_sel, y_yaw_sel)
 
 vx_vy_w_d_res_proj = -shp.project_onto(-vx_vy_w_d_result[:,:,:,:], 0, 1, 2)
 vx_vy_w_d_grid_proj = vx_vy_w_d.grid.states[..., [0,1,2]]
 vx_vy_w_d_grid_proj = vx_vy_w_d_grid_proj[:,:,:,0,:]
-vx_vy_w_d_sel = vx_vy_w_d_result[:,10,3,:]
+# vx_vy_w_d_sel = vx_vy_w_d_result[:,10,3,:]
 
 x_vx_vy_d_res_proj = -shp.project_onto(-x_vx_vy_d_result[:,:,:,:], 0, 1, 2)
 x_vx_vy_d_grid_proj = x_vx_vy_d.grid.states[..., [0,1,2]]
 x_vx_vy_d_grid_proj = x_vx_vy_d_grid_proj[:,:,:,0,:]
-x_vx_vy_d_sel = x_vx_vy_d_result[:,:,10,:]
+# x_vx_vy_d_sel = x_vx_vy_d_result[:,:,10,:]
 
 y_vx_vy_d_res_proj = -shp.project_onto(-y_vx_vy_d_result[:,:,:,:], 0, 1, 2)
 y_vx_vy_d_grid_proj = y_vx_vy_d.grid.states[..., [0,1,2]]
 y_vx_vy_d_grid_proj = y_vx_vy_d_grid_proj[:,:,:,0,:]
-y_vx_vy_d_sel = y_vx_vy_d_result[:,:,10,:]
+# y_vx_vy_d_sel = y_vx_vy_d_result[:,:,10,:]
 
-x_t = np.repeat(x_vx_vy_d_result[:,np.newaxis,:,10,:], y_vx_vy_d.grid.shape[0], axis=1)
-y_t = np.repeat(y_vx_vy_d_result[np.newaxis,:,:,10,:], x_vx_vy_d.grid.shape[0], axis=0)
-x_y_t = np.maximum(x_t, y_t)
-x_y_t = -shp.project_onto(-x_y_t, 0, 1, 2)
+x_y_yaw_mask = np.repeat(x_y_yaw_sel[:,:,np.newaxis], x_vx_vy_d.grid.shape[1], axis=2)
+x_vx_sel = np.repeat(x_vx_vy_d_result[:,np.newaxis,:,10,:], y_vx_vy_d.grid.shape[0], axis=1)
+y_vx_sel = np.repeat(y_vx_vy_d_result[np.newaxis,:,:,10,:], x_vx_vy_d.grid.shape[0], axis=0)
+x_y_vx_sel = np.maximum(x_vx_sel, y_vx_sel)
+x_y_vx_sel = -shp.project_onto(-x_y_vx_sel, 0, 1, 2)
+x_y_vx_sel = np.maximum(x_y_vx_sel, x_y_yaw_mask)
 
-x_y_t_grid = np.array(list(product(x_vx_vy_d.grid.coordinate_vectors[0], y_vx_vy_d.grid.coordinate_vectors[0], x_vx_vy_d.grid.coordinate_vectors[1])))
+x_y_vx_grid = np.array(list(product(x_vx_vy_d.grid.coordinate_vectors[0], y_vx_vy_d.grid.coordinate_vectors[0], x_vx_vy_d.grid.coordinate_vectors[1])))
 
-hj_tools.plot_set_3D(x_y_t_grid[:,0], 
-            x_y_t_grid[:,1], 
-            x_y_t_grid[:,2], 
-            x_y_t.ravel(),
+hj_tools.plot_set_3D(x_y_vx_grid[:,0], 
+            x_y_vx_grid[:,1], 
+            x_y_vx_grid[:,2], 
+            x_y_vx_sel.ravel(),
             ("x", "y", "v_x"))
 
 exit()
