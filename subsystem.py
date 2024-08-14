@@ -25,6 +25,7 @@ class Subsystem(object):
 
     def step(self):
         result = self._compute_brs(self.solver_settings, self.dynamics, self.grid, self.result_list[-1], self.time_step)
+        result = np.clip(result, -1e5, +1e5)
         self.result_list.append(result)
         return result
     
@@ -36,11 +37,14 @@ class Subsystem(object):
         return result
     
     def find_reach_range(self, dim):
-        vy_value = shp.project_onto(self.combine(), dim)
-        vy_zero_crossings = np.where(vy_value < 0.)[0]
-        range = self.grid.coordinate_vectors[dim][vy_zero_crossings]
-        if np.any(np.diff(vy_zero_crossings) != 1):
+        dim_value = shp.project_onto(self.combine(), dim)
+        zero_crossings = np.where(dim_value < 0.)[0]
+        range = self.grid.coordinate_vectors[dim][zero_crossings]
+        if np.any(np.diff(zero_crossings) != 1):
             print("WARNING: range is not convex")
+        if len(range) < 1:
+            print("WARNING: no safe range found")
+            return (0., 0.)
         return (range[0], range[-1])
     
     def _compute_brs(self, solver_settings, dynamics, grid, target, t):

@@ -11,7 +11,7 @@ avoid_dynamics = hj.systems.vx_vy_w_d(min_controls=[-.2, -16],
 min_bounds = np.array([-10., -3., -np.pi/3, -np.pi/4])
 max_bounds = np.array([+10., +3., +np.pi/3, +np.pi/4])
 grid = hj.Grid.from_lattice_parameters_and_boundary_conditions(hj.sets.Box(min_bounds, max_bounds),
-                                                               (21, 11, 9, 7))
+                                                               (21, 13, 11, 9))
 
 solver_settings = hj.SolverSettings.with_accuracy("low")
 t_step = .5
