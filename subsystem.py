@@ -38,9 +38,9 @@ class Subsystem(object):
     
     def find_reach_range(self, dim):
         dim_value = shp.project_onto(self.combine(), dim)
-        zero_crossings = np.where(dim_value < 0.)[0]
-        range = self.grid.coordinate_vectors[dim][zero_crossings]
-        if np.any(np.diff(zero_crossings) != 1):
+        negative_idxs = np.where(dim_value < 0.)[0]
+        range = self.grid.coordinate_vectors[dim][negative_idxs]
+        if np.any(np.diff(negative_idxs) != 1):
             print("WARNING: range is not convex")
         if len(range) < 1:
             print("WARNING: no safe range found")

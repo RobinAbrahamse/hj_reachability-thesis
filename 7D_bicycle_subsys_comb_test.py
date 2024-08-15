@@ -6,6 +6,8 @@ from subsystem import Subsystem
 import hj_tools
 from itertools import product
 
+
+### PARAMETERS
 time_step = .1
 n = 20
 min_controls = [-.2, -16]
@@ -13,8 +15,9 @@ max_controls = [+.2, +16]
 
 grid_dims = np.array([41, 41, 17, 21, 11, 11, 7])
 grid_mins = np.array([-20., -20., 0.,      -10., -5., -np.pi/2, -np.pi/4])
-grid_maxs = np.array([+20., +20., np.pi/2, +10., +5., +np.pi/2, +np.pi/4])
+grid_maxs = np.array([+20., +20., 2*np.pi, +10., +5., +np.pi/2, +np.pi/4])
 
+### SET UP SUBSYSTEMS
 # VX_VY_W_D
 vx_vy_w_d_dynamics = hj.systems.vx_vy_w_d(min_controls=min_controls,
                                           max_controls=max_controls).with_mode('avoid')
@@ -41,28 +44,28 @@ target_maxs = [(0, 7*np.pi/4.)]
 yaw_w = Subsystem(yaw_w_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=periodic_dims)
 
 # X_YAW
-X_yaw_dynamics = hj.systems.X_yaw().with_mode('avoid')
-X_yaw_idxs = [0,2]
-subsys_grid_mins = grid_mins[X_yaw_idxs]
-subsys_grid_maxs = grid_maxs[X_yaw_idxs]
-grid_res = tuple(grid_dims[X_yaw_idxs])
+x_yaw_dynamics = hj.systems.X_yaw().with_mode('avoid')
+x_yaw_idxs = [0,2]
+subsys_grid_mins = grid_mins[x_yaw_idxs]
+subsys_grid_maxs = grid_maxs[x_yaw_idxs]
+grid_res = tuple(grid_dims[x_yaw_idxs])
 periodic_dims = 1
 target_mins = [(0, -6.), (1, np.pi/4.)]
 target_maxs = [(0, +6.), (1, 7*np.pi/4.)]
 
-x_yaw = Subsystem(X_yaw_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=periodic_dims)
+x_yaw = Subsystem(x_yaw_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=periodic_dims)
 
 # Y_YAW
-Y_yaw_dynamics = hj.systems.Y_yaw().with_mode('avoid')
-Y_yaw_idxs = [0,2]
-subsys_grid_mins = grid_mins[Y_yaw_idxs]
-subsys_grid_maxs = grid_maxs[Y_yaw_idxs]
-grid_res = tuple(grid_dims[Y_yaw_idxs])
+y_yaw_dynamics = hj.systems.Y_yaw().with_mode('avoid')
+y_yaw_idxs = [1,2]
+subsys_grid_mins = grid_mins[y_yaw_idxs]
+subsys_grid_maxs = grid_maxs[y_yaw_idxs]
+grid_res = tuple(grid_dims[y_yaw_idxs])
 periodic_dims = 1
 target_mins = [(0, -2.), (1, np.pi/4.)]
 target_maxs = [(0, +2.), (1, 7*np.pi/4.)]
 
-y_yaw = Subsystem(X_yaw_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=periodic_dims)
+y_yaw = Subsystem(x_yaw_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=periodic_dims)
 
 # X_VX_VY_D
 x_vx_vy_d_dynamics = hj.systems.X_vx_vy_d(min_controls=min_controls,
@@ -88,8 +91,7 @@ target_maxs = [(0, +2.), (1, 0.)]
 
 y_vx_vy_d = Subsystem(y_vx_vy_d_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs)
 
-
-# Step 2 to n
+# CALCULATE SUBSYTEM AVOID SETS
 print("Starting reachability calculations...")
 for i in range(n):
     vx_vy_w_d.step()
@@ -117,7 +119,8 @@ for i in range(n):
 print("Done")
 
 
-# Combine and project results
+### COMBINE RESULTS
+print("Combining and projecting results...")
 vx_vy_w_d_result = vx_vy_w_d.combine()
 yaw_w_result = yaw_w.combine()
 x_yaw_result = x_yaw.combine()
@@ -135,17 +138,17 @@ def back_project(grid_dims, subsys_value, subsys_idxs):
 ### BACK PROJECT FULL
 value_function = back_project(grid_dims, vx_vy_w_d_result, vx_vy_w_d_idxs)
 value_function = np.maximum(value_function, back_project(grid_dims, yaw_w_result, yaw_w_idxs))
-value_function = np.maximum(value_function, back_project(grid_dims, x_yaw_result, X_yaw_idxs))
-value_function = np.maximum(value_function, back_project(grid_dims, y_yaw_result, Y_yaw_idxs))
+value_function = np.maximum(value_function, back_project(grid_dims, x_yaw_result, x_yaw_idxs))
+value_function = np.maximum(value_function, back_project(grid_dims, y_yaw_result, y_yaw_idxs))
 value_function = np.maximum(value_function, back_project(grid_dims, x_vx_vy_d_result, x_vx_vy_d_idxs))
 value_function = np.maximum(value_function, back_project(grid_dims, y_vx_vy_d_result, y_vx_vy_d_idxs))
 
 value_function_d = -shp.project_onto(-value_function, 0, 1, 2, 3, 4, 5)
 
 ### BACK PROJECT MANUAL
-x_yaw_sel = (x_yaw_result[:,2] + x_yaw_result[:,3]*2)/3.
-y_yaw_sel = (y_yaw_result[:,2] + y_yaw_result[:,3]*2)/3.
-yaw_w_sel = (yaw_w_result[2,3] + yaw_w_result[3,3]*2)/3.
+x_yaw_sel = x_yaw_result[:,2]
+y_yaw_sel = y_yaw_result[:,2]
+yaw_w_sel = yaw_w_result[2,2]
 
 x_yaw_sel = back_project(grid_dims[[0,1]], x_yaw_sel, [0])
 y_yaw_sel = back_project(grid_dims[[0,1]], y_yaw_sel, [1])
@@ -162,12 +165,17 @@ x_y_vx_sel = np.maximum(x_vx_sel, y_vx_sel)
 x_y_vx_sel = -shp.project_onto(-x_y_vx_sel, 0, 1, 2)
 x_y_vx_sel = np.maximum(x_y_vx_sel, x_y_yaw_mask)
 
+print("Done")
+
+
+
+### PLOTTING
 x_y_vx_grid = np.array(list(product(x_vx_vy_d.grid.coordinate_vectors[0], y_vx_vy_d.grid.coordinate_vectors[0], x_vx_vy_d.grid.coordinate_vectors[1])))
 
 hj_tools.plot_set_3D(x_y_vx_grid[:,0], 
             x_y_vx_grid[:,1], 
             x_y_vx_grid[:,2], 
-            value_function_d[:,:,3,:,10,3].ravel(),
+            value_function_d[:,:,2,:,10,2].ravel(),
             # x_y_vx_sel.ravel(),
             ("x", "y", "v_x"))
 hj_tools.plot_set_3D(x_y_vx_grid[:,0], 
@@ -219,4 +227,3 @@ plt.colorbar()
 plt.xlabel('y')
 plt.ylabel('yaw')
 plt.show()
-
