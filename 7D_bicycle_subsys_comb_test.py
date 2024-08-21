@@ -10,8 +10,8 @@ from itertools import product
 ### PARAMETERS
 time_step = .1
 n = 20
-min_controls = [-.2, -16]
-max_controls = [+.2, +16]
+min_controls = [-2.0, -16]
+max_controls = [+1.5, +16]
 
 grid_dims = np.array([41, 41, 17, 21, 11, 11, 7])
 grid_mins = np.array([-20., -20., 0.,      -10., -5., -np.pi/2, -np.pi/4])
@@ -163,6 +163,34 @@ x_y_yaw_mask = back_project(grid_dims[[0,1,3]], x_y_yaw_sel, [0, 1])
 x_y_vx_sel = np.maximum(x_y_vx_sel, x_y_yaw_mask)
 
 print("Done")
+
+
+### LEAST-RESTRICTIVE CONTROL SET
+def plot_control_sets(x):
+    a, b = hj_tools.lrcs(vx_vy_w_d_dynamics, vx_vy_w_d.grid, time_step, vx_vy_w_d_result, x[[3,4,5,6]])
+    xs, ys = np.meshgrid(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]))
+    control_set = a + b[0]*xs + b[1]*ys
+
+    a, b = hj_tools.lrcs(x_vx_vy_d_dynamics, x_vx_vy_d.grid, time_step, x_vx_vy_d_result, x[[0,3,4,6]])
+    xs, ys = np.meshgrid(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]))
+    control_set = np.minimum(control_set, a + b[0]*xs + b[1]*ys)
+
+    a, b = hj_tools.lrcs(y_vx_vy_d_dynamics, y_vx_vy_d.grid, time_step, y_vx_vy_d_result, x[[1,3,4,6]])
+    xs, ys = np.meshgrid(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]))
+    control_set = np.minimum(control_set, a + b[0]*xs + b[1]*ys)
+
+    a, b = hj_tools.lrcs(yaw_w_d_dynamics, yaw_w_d.grid, time_step, yaw_w_d_result, x[[2,5,6]])
+    xs, ys = np.meshgrid(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]))
+    control_set = np.minimum(control_set, a + b[0]*xs + b[1]*ys)
+    # control_set = (control_set >= 0)
+    plt.figure(figsize=(13, 8))
+    plt.contourf(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]), control_set)
+    plt.colorbar()
+    plt.xlabel('a_x')
+    plt.ylabel('delta_dot')
+    plt.show()
+x = np.array([3.0, 2.0, 0.2, 0.5, 0.0, 0.4, 0.0])
+plot_control_sets(x)
 
 
 ### PLOTTING

@@ -25,7 +25,7 @@ class Subsystem(object):
 
     def step(self):
         result = self._compute_brs(self.solver_settings, self.dynamics, self.grid, self.result_list[-1], self.time_step)
-        result = np.clip(result, -1e5, +1e5)
+        result = np.nan_to_num(result, copy=True, nan=np.inf)
         self.result_list.append(result)
         return result
     
