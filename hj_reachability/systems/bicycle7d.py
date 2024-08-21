@@ -62,30 +62,33 @@ class Bicycle7D(dynamics.ControlAndDisturbanceAffineDynamics):
     # Implements the affine dynamics 
     #   `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`.
     # 
-    #   x_dot = v * cos(yaw) + d_1
-    #   y_dot = v * sin(yaw) + d_2
-    #   yaw_dot = (v * tan(delta))/L + d3
-    #   delta_dot = u1 + d4
-    #   v_dot = u2 + d5
-        
+    #   F_cr = -self.C * (v_y - w_z*self.l_r)/clip_mag(v_x, e)
+    #   F_cf = -self.C * ((v_y + w_z*self.l_f)/clip_mag(v_x, e) - delta)
+    #
+    #   x_dot = v_x * jnp.cos(yaw) - v_y * jnp.sin(yaw)
+    #   y_dot = v_x * jnp.sin(yaw) + v_y * jnp.cos(yaw)
+    #   yaw_dot = w_z
+    #   v_x_dot = w_z * v_y + a_x
+    #   v_y_dot = -w_z * v_x + 1./self.m * (F_cr + F_cf*jnp.cos(delta))
+    #   w_z_dot = 1./self.I_z * (self.l_f*F_cf - self.l_r*F_cr)
+    #   delta_dot = w_s
 
     def open_loop_dynamics(self, state, time):
-        x, y, yaw, v_x, v_y, yaw_rate, delta = state
-        F_cr = -self.C * (v_y + yaw_rate*self.l_r)
-        F_cf = -self.C * (v_y - yaw_rate*self.l_f)
+        x, y, yaw, v_x, v_y, w_z, delta = state
+        F_cr = -self.C * (v_y - w_z*self.l_r)/clip_mag(v_x, e)
+        F_cf = -self.C * ((v_y + w_z*self.l_f)/clip_mag(v_x, e) - delta)
         return jnp.array([
             v_x * jnp.cos(yaw) - v_y * jnp.sin(yaw),
             v_x * jnp.sin(yaw) + v_y * jnp.cos(yaw),
-            yaw_rate,
-            yaw_rate * v_y,
-            -yaw_rate * v_x + 2/self.m * (F_cr + F_cf*jnp.cos(delta)),
-            2/self.I_z * (self.l_f*F_cf - self.l_r*F_cr),
+            w_z,
+            w_z * v_y,
+            -w_z * v_x + 1./self.m * (F_cr + F_cf*jnp.cos(delta)),
+            1./self.I_z * (self.l_f*F_cf - self.l_r*F_cr),
             0.
         ])
 
     def control_jacobian(self, state, time):
-        x, y, yaw, v_x, v_y, yaw_rate, delta = state
-        F_cf = self.C * (v_y - yaw_rate*self.l_f)
+        x, y, yaw, v_x, v_y, w_z, delta = state
         return jnp.array([
             [0., 0.],
             [0., 0.],
@@ -98,6 +101,7 @@ class Bicycle7D(dynamics.ControlAndDisturbanceAffineDynamics):
 
     def disturbance_jacobian(self, state, time):
         return jnp.identity(7)
+
 
 class X_vx_vy_d(dynamics.Dynamics):
 
@@ -146,17 +150,6 @@ class X_vx_vy_d(dynamics.Dynamics):
             self.disturbance_mode = "min"
         return self
 
-    ## Dynamics
-    # Implements the affine dynamics 
-    #   `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`.
-    # 
-    #   x_dot = v * cos(yaw) + d_1
-    #   y_dot = v * sin(yaw) + d_2
-    #   yaw_dot = (v * tan(delta))/L + d3
-    #   delta_dot = u1 + d4
-    #   v_dot = u2 + d5
-        
-
     def open_loop_dynamics(self, state, time):
         x, v_x, v_y, delta = state
         # F_cr = -C * (v_y - w_z*l_r)/clip_mag(v_x, e)
@@ -192,7 +185,7 @@ class X_vx_vy_d(dynamics.Dynamics):
         return jnp.array([
             v_x * jnp.cos(yaw) - v_y * jnp.sin(yaw),
             w * v_y, # w * v_y,
-            -w * v_x - self.C/self.m * w * (self.l_f*jnp.cos(delta) - self.l_r)/clip_mag(v_x, e), # -w * v_x + 2/self.m * (F_cr + F_cf*jnp.cos(delta)),
+            -w * v_x - self.C/self.m * w * (self.l_f*jnp.cos(delta) - self.l_r)/clip_mag(v_x, e), # -w * v_x + 1/self.m * (F_cr + F_cf*jnp.cos(delta)),
             0.
         ])
     
@@ -237,7 +230,6 @@ class X_vx_vy_d(dynamics.Dynamics):
         return (jnp.abs(self.open_loop_dynamics(state, time)) +
                 jnp.abs(self.control_jacobian(state, time)) @ self.control_space.max_magnitudes +
                 jnp.abs(self.disturbance_dynamics(state, time, self.disturbance_space.max_magnitudes)))
-
 
 
 class Y_vx_vy_d(dynamics.Dynamics):
@@ -286,16 +278,6 @@ class Y_vx_vy_d(dynamics.Dynamics):
             self.control_mode = "max"
             self.disturbance_mode = "min"
         return self
-
-    ## Dynamics
-    # Implements the affine dynamics 
-    #   `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`.
-    # 
-    #   x_dot = v * cos(yaw) + d_1
-    #   y_dot = v * sin(yaw) + d_2
-    #   yaw_dot = (v * tan(delta))/L + d3
-    #   delta_dot = u1 + d4
-    #   v_dot = u2 + d5
         
     def open_loop_dynamics(self, state, time):
         y, v_x, v_y, delta = state
@@ -304,7 +286,6 @@ class Y_vx_vy_d(dynamics.Dynamics):
         return jnp.array([
             0., # v_x * jnp.sin(yaw) + v_y * jnp.cos(yaw),
             0., # w * v_y,
-            # -2/self.m*self.C*v_y*(1 + jnp.cos(delta)), # -w * v_x + 1/self.m * (F_cr + F_cf*jnp.cos(delta)),
             -self.C/self.m*(v_y*(1 + jnp.cos(delta))/clip_mag(v_x, e) - delta*jnp.cos(delta)), # -w * v_x + 1/self.m * (F_cr + F_cf*jnp.cos(delta)),
             0.
         ])
@@ -319,7 +300,7 @@ class Y_vx_vy_d(dynamics.Dynamics):
         ])
 
     def affine_disturbance_jacobian(self, state, time):
-        # return jnp.identity(4)
+        # disturbance: w
         x, v_x, v_y, delta = state
         return jnp.array([
             [v_y],
@@ -380,8 +361,6 @@ class Y_vx_vy_d(dynamics.Dynamics):
                 jnp.abs(self.disturbance_dynamics(state, time, self.disturbance_space.max_magnitudes)))
 
 
-    
-
 class X_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
 
     def __init__(self,
@@ -417,17 +396,6 @@ class X_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
             self.disturbance_mode = "min"
         return self
 
-    ## Dynamics
-    # Implements the affine dynamics 
-    #   `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`.
-    # 
-    #   x_dot = v * cos(yaw) + d_1
-    #   y_dot = v * sin(yaw) + d_2
-    #   yaw_dot = (v * tan(delta))/L + d3
-    #   delta_dot = u1 + d4
-    #   v_dot = u2 + d5
-        
-
     def open_loop_dynamics(self, state, time):
         x, yaw = state
         return jnp.array([
@@ -447,7 +415,8 @@ class X_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
         return jnp.array([
             [jnp.cos(yaw), -jnp.sin(yaw), 0.],
             [0.,           0.,            1]
-        ])    
+        ])
+
 
 class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
 
@@ -486,17 +455,6 @@ class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
             self.disturbance_mode = "min"
         return self
 
-    ## Dynamics
-    # Implements the affine dynamics 
-    #   `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`.
-    # 
-    #   x_dot = v * cos(yaw) + d_1
-    #   y_dot = v * sin(yaw) + d_2
-    #   yaw_dot = (v * tan(delta))/L + d3
-    #   delta_dot = u1 + d4
-    #   v_dot = u2 + d5
-        
-
     def open_loop_dynamics(self, state, time):
         y, yaw = state
         return jnp.array([
@@ -518,6 +476,7 @@ class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
             [jnp.sin(yaw), jnp.cos(yaw), 0.],
             [0.,           0.,           1.]
         ])
+
 
 class vx_vy_w_d(dynamics.ControlAndDisturbanceAffineDynamics):
 
@@ -559,17 +518,6 @@ class vx_vy_w_d(dynamics.ControlAndDisturbanceAffineDynamics):
             self.control_mode = "max"
             self.disturbance_mode = "min"
         return self
-
-    ## Dynamics
-    # Implements the affine dynamics 
-    #   `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`.
-    # 
-    #   x_dot = v * cos(yaw) + d_1
-    #   y_dot = v * sin(yaw) + d_2
-    #   yaw_dot = (v * tan(delta))/L + d3
-    #   delta_dot = u1 + d4
-    #   v_dot = u2 + d5
-        
 
     def open_loop_dynamics(self, state, time):
         v_x, v_y, w, delta = state
@@ -637,17 +585,6 @@ class yaw_w_d(dynamics.Dynamics):
             self.control_mode = "max"
             self.disturbance_mode = "min"
         return self
-
-    ## Dynamics
-    # Implements the affine dynamics 
-    #   `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`.
-    # 
-    #   x_dot = v * cos(yaw) + d_1
-    #   y_dot = v * sin(yaw) + d_2
-    #   yaw_dot = (v * tan(delta))/L + d3
-    #   delta_dot = u1 + d4
-    #   v_dot = u2 + d5
-        
 
     def open_loop_dynamics(self, state, time):
         yaw, w, delta = state

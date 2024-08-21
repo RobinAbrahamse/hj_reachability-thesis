@@ -13,9 +13,12 @@ n = 20
 min_controls = [-2.0, -16]
 max_controls = [+1.5, +16]
 
-grid_dims = np.array([41, 41, 17, 21, 11, 11, 7])
-grid_mins = np.array([-20., -20., 0.,      -10., -5., -np.pi/2, -np.pi/4])
-grid_maxs = np.array([+20., +20., 2*np.pi, +10., +5., +np.pi/2, +np.pi/4])
+# grid_dims = np.array([41, 41, 17, 21, 11, 11, 7])
+# grid_mins = np.array([-20., -20., 0.,      -10., -5., -np.pi/2, -np.pi/4])
+# grid_maxs = np.array([+20., +20., 2*np.pi, +10., +5., +np.pi/2, +np.pi/4])
+grid_dims = np.array([21, 21, 11, 21, 9, 9, 7])
+grid_mins = np.array([-10., -10., 0.,      -10., -5., -np.pi/2, -np.pi/4])
+grid_maxs = np.array([+10., +10., 2*np.pi, +10., +5., +np.pi/2, +np.pi/4])
 
 ### SET UP SUBSYSTEMS
 # VX_VY_W_D
@@ -144,29 +147,36 @@ value_function = np.maximum(value_function, back_project(grid_dims, y_vx_vy_d_re
 
 value_function_d = -shp.project_onto(-value_function, 0, 1, 2, 3, 4, 5)
 
+dynamics = hj.systems.Bicycle7D(min_controls=min_controls,
+                                max_controls=max_controls).with_mode('avoid')
+grid = hj.Grid.from_lattice_parameters_and_boundary_conditions(
+                                hj.sets.Box(grid_mins, grid_maxs),
+                                grid_dims,
+                                periodic_dims=[2])
+
 ### BACK PROJECT MANUAL
-x_yaw_sel = x_yaw_result[:,2]
-y_yaw_sel = y_yaw_result[:,2]
-yaw_w_d_sel = yaw_w_d_result[2,2,:]
+# x_yaw_sel = x_yaw_result[:,2]
+# y_yaw_sel = y_yaw_result[:,2]
+# yaw_w_d_sel = yaw_w_d_result[2,2,:]
 
-x_yaw_sel = back_project(grid_dims[[0,1]], x_yaw_sel, [0])
-y_yaw_sel = back_project(grid_dims[[0,1]], y_yaw_sel, [1])
-x_y_yaw_sel = np.maximum(x_yaw_sel, y_yaw_sel)
+# x_yaw_sel = back_project(grid_dims[[0,1]], x_yaw_sel, [0])
+# y_yaw_sel = back_project(grid_dims[[0,1]], y_yaw_sel, [1])
+# x_y_yaw_sel = np.maximum(x_yaw_sel, y_yaw_sel)
 
-x_vx_sel = back_project(grid_dims[[0,1,3,6]], x_vx_vy_d_result[:,:,10,:], [0, 2, 3])
-y_vx_sel = back_project(grid_dims[[0,1,3,6]], y_vx_vy_d_result[:,:,10,:], [1, 2, 3])
-x_y_vx_sel = np.maximum(x_vx_sel, y_vx_sel)
-yaw_w_d_mask = back_project(grid_dims[[0,1,3,6]], yaw_w_d_sel, [3])
-x_y_vx_sel = np.maximum(x_y_vx_sel, yaw_w_d_mask)
-x_y_vx_sel = -shp.project_onto(-x_y_vx_sel, 0, 1, 2)
-x_y_yaw_mask = back_project(grid_dims[[0,1,3]], x_y_yaw_sel, [0, 1])
-x_y_vx_sel = np.maximum(x_y_vx_sel, x_y_yaw_mask)
+# x_vx_sel = back_project(grid_dims[[0,1,3,6]], x_vx_vy_d_result[:,:,10,:], [0, 2, 3])
+# y_vx_sel = back_project(grid_dims[[0,1,3,6]], y_vx_vy_d_result[:,:,10,:], [1, 2, 3])
+# x_y_vx_sel = np.maximum(x_vx_sel, y_vx_sel)
+# yaw_w_d_mask = back_project(grid_dims[[0,1,3,6]], yaw_w_d_sel, [3])
+# x_y_vx_sel = np.maximum(x_y_vx_sel, yaw_w_d_mask)
+# x_y_vx_sel = -shp.project_onto(-x_y_vx_sel, 0, 1, 2)
+# x_y_yaw_mask = back_project(grid_dims[[0,1,3]], x_y_yaw_sel, [0, 1])
+# x_y_vx_sel = np.maximum(x_y_vx_sel, x_y_yaw_mask)
 
 print("Done")
 
 
 ### LEAST-RESTRICTIVE CONTROL SET
-def plot_control_sets(x):
+def plot_combined_control_set(x):
     a, b = hj_tools.lrcs(vx_vy_w_d_dynamics, vx_vy_w_d.grid, time_step, vx_vy_w_d_result, x[[3,4,5,6]])
     xs, ys = np.meshgrid(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]))
     control_set = a + b[0]*xs + b[1]*ys
@@ -188,10 +198,25 @@ def plot_control_sets(x):
     plt.colorbar()
     plt.xlabel('a_x')
     plt.ylabel('delta_dot')
-    plt.show()
-x = np.array([3.0, 2.0, 0.2, 0.5, 0.0, 0.4, 0.0])
-plot_control_sets(x)
+    # plt.show()
 
+def plot_reconstructed_control_set(x):
+    a, b = hj_tools.lrcs(dynamics, grid, time_step, value_function, x)
+    xs, ys = np.meshgrid(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]))
+    control_set = a + b[0]*xs + b[1]*ys
+    # control_set = (control_set >= 0)
+    plt.figure(figsize=(13, 8))
+    plt.contourf(np.linspace(min_controls[0], max_controls[0]), np.linspace(min_controls[1], max_controls[1]), control_set)
+    plt.colorbar()
+    plt.xlabel('a_x')
+    plt.ylabel('delta_dot')
+    # plt.show()
+
+x = np.array([3.0, 2.0, 0.2, 0.5, 0.0, 0.4, 0.0])
+plot_combined_control_set(x)
+plot_reconstructed_control_set(x)
+plt.show()
+exit()
 
 ### PLOTTING
 x_y_vx_grid = np.array(list(product(x_vx_vy_d.grid.coordinate_vectors[0], y_vx_vy_d.grid.coordinate_vectors[0], x_vx_vy_d.grid.coordinate_vectors[1])))
