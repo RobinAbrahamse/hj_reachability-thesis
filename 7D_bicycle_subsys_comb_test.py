@@ -30,18 +30,18 @@ target_maxs = [(0, 0.)]
 
 vx_vy_w_d = Subsystem(vx_vy_w_d_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs)
 
-# YAW_W
-yaw_w_dynamics = hj.systems.yaw_w().with_mode('avoid')
-
-yaw_w_idxs = [2,5]
-subsys_grid_mins = grid_mins[yaw_w_idxs]
-subsys_grid_maxs = grid_maxs[yaw_w_idxs]
-grid_res = tuple(grid_dims[yaw_w_idxs])
+# YAW_W_D
+yaw_w_d_dynamics = hj.systems.yaw_w_d(min_controls=min_controls,
+                                      max_controls=max_controls).with_mode('avoid')
+yaw_w_d_idxs = [2,5,6]
+subsys_grid_mins = grid_mins[yaw_w_d_idxs]
+subsys_grid_maxs = grid_maxs[yaw_w_d_idxs]
+grid_res = tuple(grid_dims[yaw_w_d_idxs])
 periodic_dims = 0
 target_mins = [(0, np.pi/4.)]
 target_maxs = [(0, 7*np.pi/4.)]
 
-yaw_w = Subsystem(yaw_w_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=periodic_dims)
+yaw_w_d = Subsystem(yaw_w_d_dynamics, subsys_grid_mins, subsys_grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=periodic_dims)
 
 # X_YAW
 x_yaw_dynamics = hj.systems.X_yaw().with_mode('avoid')
@@ -98,11 +98,10 @@ for i in range(n):
     vx_virt_disturbance = vx_vy_w_d.find_reach_range(dim=0)
     vy_virt_disturbance = vx_vy_w_d.find_reach_range(dim=1)
     w_virt_disturbance = vx_vy_w_d.find_reach_range(dim=2)
-    delta_virt_disturbance = vx_vy_w_d.find_reach_range(dim=3)
-    yaw_w.set_disturbances([vx_virt_disturbance[0], vy_virt_disturbance[0], delta_virt_disturbance[0]],
-                           [vx_virt_disturbance[1], vy_virt_disturbance[1], delta_virt_disturbance[1]])
-    yaw_w.step()
-    yaw_virt_disturbance = yaw_w.find_reach_range(dim=0)
+    yaw_w_d.set_disturbances([vx_virt_disturbance[0], vy_virt_disturbance[0]],
+                             [vx_virt_disturbance[1], vy_virt_disturbance[1]])
+    yaw_w_d.step()
+    yaw_virt_disturbance = yaw_w_d.find_reach_range(dim=0)
     x_yaw.set_disturbances([vx_virt_disturbance[0], vy_virt_disturbance[0], w_virt_disturbance[0]],
                            [vx_virt_disturbance[1], vy_virt_disturbance[1], w_virt_disturbance[1]])
     x_yaw.step()
@@ -122,7 +121,7 @@ print("Done")
 ### COMBINE RESULTS
 print("Combining and projecting results...")
 vx_vy_w_d_result = vx_vy_w_d.combine()
-yaw_w_result = yaw_w.combine()
+yaw_w_d_result = yaw_w_d.combine()
 x_yaw_result = x_yaw.combine()
 y_yaw_result = y_yaw.combine()
 x_vx_vy_d_result = x_vx_vy_d.combine()
@@ -137,7 +136,7 @@ def back_project(grid_dims, subsys_value, subsys_idxs):
 
 ### BACK PROJECT FULL
 value_function = back_project(grid_dims, vx_vy_w_d_result, vx_vy_w_d_idxs)
-value_function = np.maximum(value_function, back_project(grid_dims, yaw_w_result, yaw_w_idxs))
+value_function = np.maximum(value_function, back_project(grid_dims, yaw_w_d_result, yaw_w_d_idxs))
 value_function = np.maximum(value_function, back_project(grid_dims, x_yaw_result, x_yaw_idxs))
 value_function = np.maximum(value_function, back_project(grid_dims, y_yaw_result, y_yaw_idxs))
 value_function = np.maximum(value_function, back_project(grid_dims, x_vx_vy_d_result, x_vx_vy_d_idxs))
@@ -148,25 +147,22 @@ value_function_d = -shp.project_onto(-value_function, 0, 1, 2, 3, 4, 5)
 ### BACK PROJECT MANUAL
 x_yaw_sel = x_yaw_result[:,2]
 y_yaw_sel = y_yaw_result[:,2]
-yaw_w_sel = yaw_w_result[2,2]
+yaw_w_d_sel = yaw_w_d_result[2,2,:]
 
 x_yaw_sel = back_project(grid_dims[[0,1]], x_yaw_sel, [0])
 y_yaw_sel = back_project(grid_dims[[0,1]], y_yaw_sel, [1])
 x_y_yaw_sel = np.maximum(x_yaw_sel, y_yaw_sel)
 
-vx_vy_w_d_res_proj = -shp.project_onto(-vx_vy_w_d_result[:,:,:,:], 0, 1, 2)
-x_vx_vy_d_res_proj = -shp.project_onto(-x_vx_vy_d_result[:,:,:,:], 0, 1, 2)
-y_vx_vy_d_res_proj = -shp.project_onto(-y_vx_vy_d_result[:,:,:,:], 0, 1, 2)
-
-x_y_yaw_mask = back_project(grid_dims[[0,1,3]], x_y_yaw_sel, [0, 1])
 x_vx_sel = back_project(grid_dims[[0,1,3,6]], x_vx_vy_d_result[:,:,10,:], [0, 2, 3])
 y_vx_sel = back_project(grid_dims[[0,1,3,6]], y_vx_vy_d_result[:,:,10,:], [1, 2, 3])
 x_y_vx_sel = np.maximum(x_vx_sel, y_vx_sel)
+yaw_w_d_mask = back_project(grid_dims[[0,1,3,6]], yaw_w_d_sel, [3])
+x_y_vx_sel = np.maximum(x_y_vx_sel, yaw_w_d_mask)
 x_y_vx_sel = -shp.project_onto(-x_y_vx_sel, 0, 1, 2)
+x_y_yaw_mask = back_project(grid_dims[[0,1,3]], x_y_yaw_sel, [0, 1])
 x_y_vx_sel = np.maximum(x_y_vx_sel, x_y_yaw_mask)
 
 print("Done")
-
 
 
 ### PLOTTING
@@ -185,6 +181,11 @@ hj_tools.plot_set_3D(x_y_vx_grid[:,0],
             ("x", "y", "v_x"))
 
 breakpoint()
+
+vx_vy_w_d_res_proj = -shp.project_onto(-vx_vy_w_d_result[:,:,:,:], 0, 1, 2)
+x_vx_vy_d_res_proj = -shp.project_onto(-x_vx_vy_d_result[:,:,:,:], 0, 1, 2)
+y_vx_vy_d_res_proj = -shp.project_onto(-y_vx_vy_d_result[:,:,:,:], 0, 1, 2)
+yaw_w_d_res_proj = -shp.project_onto(-yaw_w_d_result[:,:,:], 0, 1)
 
 vx_vy_w_grid = np.array(list(product(vx_vy_w_d.grid.coordinate_vectors[0], vx_vy_w_d.grid.coordinate_vectors[1], vx_vy_w_d.grid.coordinate_vectors[2])))
 hj_tools.plot_set_3D(vx_vy_w_grid[..., 0].ravel(), 
@@ -208,7 +209,7 @@ hj_tools.plot_set_3D(y_vx_vy_grid[..., 0].ravel(),
             ("y", "v_x", "v_y"))
 
 plt.figure(figsize=(13, 8))
-plt.contourf(yaw_w.grid.coordinate_vectors[0], yaw_w.grid.coordinate_vectors[1], yaw_w_result[:, :].T)
+plt.contourf(yaw_w_d.grid.coordinate_vectors[0], yaw_w_d.grid.coordinate_vectors[1], yaw_w_d_res_proj[:, :].T)
 plt.colorbar()
 plt.xlabel('yaw')
 plt.ylabel('yaw rate')

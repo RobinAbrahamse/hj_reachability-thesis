@@ -211,7 +211,7 @@ class X_vx_vy_d(dynamics.Dynamics):
             return grad_value[0] * (v_x * jnp.cos(yaw) - v_y * jnp.sin(yaw))
         
         n = 50
-        yaws = jnp.array([i*(self.disturbance_space.hi[0] - self.disturbance_space.lo[0])/n for i in range(n)])
+        yaws = jnp.array([self.disturbance_space.lo[0] + i*(self.disturbance_space.hi[0] - self.disturbance_space.lo[0])/n for i in range(n)])
         vals = yaw_disturbance_value_function(yaws)
         yaw_disturbance = 0
 
@@ -594,9 +594,11 @@ class vx_vy_w_d(dynamics.ControlAndDisturbanceAffineDynamics):
         return jnp.identity(4)
 
 
-class yaw_w(dynamics.Dynamics):
+class yaw_w_d(dynamics.Dynamics):
 
     def __init__(self,
+                 min_controls,
+                 max_controls,
                  min_disturbances=None, 
                  max_disturbances=None,
                  control_mode="max",
@@ -615,8 +617,8 @@ class yaw_w(dynamics.Dynamics):
             max_disturbances = [0]
 
         if control_space is None:
-            control_space = sets.Box(jnp.array([0.]),
-                                     jnp.array([0.]))
+            control_space = sets.Box(jnp.array(min_controls),
+                                     jnp.array(max_controls))
         
         if disturbance_space is None:
             disturbance_space = sets.Box(jnp.array(min_disturbances),
@@ -648,36 +650,32 @@ class yaw_w(dynamics.Dynamics):
         
 
     def open_loop_dynamics(self, state, time):
-        yaw, w = state
+        yaw, w, delta = state
         # F_cr = -self.C * (v_y - w*self.l_r)/clip_mag(v_x, e)
         # F_cf = -self.C * ((v_y + w*self.l_f)/clip_mag(v_x, e) - delta)
         return jnp.array([
             w,
-            0. # 1/self.I_z * (self.l_f*F_cf - self.l_r*F_cr)
+            0., # 1/self.I_z * (self.l_f*F_cf - self.l_r*F_cr)
+            0.
         ])
 
     def control_jacobian(self, state, time):
         return jnp.array([
-            [0.],
-            [0.],
-        ])
-
-    def affine_disturbance_jacobian(self, state, time):
-        # disturbances: delta
-        return jnp.array([
-            [0.],
-            [-self.C/self.I_z*self.l_f]
+            [0., 0.],
+            [0., 0.],
+            [0., 1.]
         ])
     
     def disturbance_dynamics(self, state, time, disturbance):
-        yaw, w = state
-        v_x, v_y, delta = disturbance
+        yaw, w, delta = state
+        v_x, v_y = disturbance
         return jnp.array([
             0.,
             -self.C/self.I_z * (
                 v_y * (self.l_f-self.l_r)/clip_mag(v_x, e) + 
                 w * (self.l_f**2 + self.l_r**2)/clip_mag(v_x, e) + 
                 delta*self.l_f),
+            0.
         ])
         
     def optimal_control_and_disturbance(self, state, time, grad_value):
@@ -685,23 +683,16 @@ class yaw_w(dynamics.Dynamics):
         control_direction = grad_value @ self.control_jacobian(state, time)
         if self.control_mode == "min":
             control_direction = -control_direction
-        disturbance_direction = grad_value @ self.affine_disturbance_jacobian(state, time)
-        if self.disturbance_mode == "min":
-            disturbance_direction = -disturbance_direction
 
-        delta_disturbance = self.disturbance_space.extreme_point(jnp.array([0., 0., disturbance_direction[0]]))[2]
-        # delta_disturbance *= jnp.sign(disturbance_direction)
-        # print(jnp.sign(disturbance_direction))
-
-        yaw, w = state
+        yaw, w, delta = state
         def w_v_y_disturbance_value_function(v_xs, v_ys):
             v_x_grid, v_y_grid = jnp.meshgrid(v_xs, v_ys)
-            val = -v_y_grid/clip_mag(v_x_grid, e)*(self.l_f - self.l_r) - w/clip_mag(v_xs, e)*(self.l_f**2 + self.l_r**2) - delta_disturbance*self.l_f
+            val = -v_y_grid/clip_mag(v_x_grid, e)*(self.l_f - self.l_r) - w/clip_mag(v_xs, e)*(self.l_f**2 + self.l_r**2) - delta*self.l_f
             return grad_value[1] * val
         
         n = 50
-        v_xs = jnp.array([i*(self.disturbance_space.hi[0] - self.disturbance_space.lo[0])/n for i in range(n)])
-        v_ys = jnp.array([i*(self.disturbance_space.hi[1] - self.disturbance_space.lo[1])/n for i in range(n)])
+        v_xs = jnp.array([self.disturbance_space.lo[0] + i*(self.disturbance_space.hi[0] - self.disturbance_space.lo[0])/n for i in range(n)])
+        v_ys = jnp.array([self.disturbance_space.lo[1] + i*(self.disturbance_space.hi[1] - self.disturbance_space.lo[1])/n for i in range(n)])
         vals = w_v_y_disturbance_value_function(v_xs, v_ys)
         v_x_disturbance = 0
         v_y_disturbance = 0
@@ -716,7 +707,7 @@ class yaw_w(dynamics.Dynamics):
             v_y_disturbance = v_ys[idy]
         
         return (self.control_space.extreme_point(control_direction),
-                jnp.array([v_x_disturbance, v_y_disturbance, delta_disturbance]))
+                jnp.array([v_x_disturbance, v_y_disturbance]))
     
     def __call__(self, state, control, disturbance, time):
         """Implements the affine dynamics `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t)`."""
