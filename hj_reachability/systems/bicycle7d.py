@@ -100,7 +100,7 @@ class Bicycle7D(dynamics.ControlAndDisturbanceAffineDynamics):
         ])
 
     def disturbance_jacobian(self, state, time):
-        return jnp.identity(7)
+        return jnp.zeros(7)
 
 
 class X_vx_vy_d(dynamics.Dynamics):
@@ -174,6 +174,7 @@ class X_vx_vy_d(dynamics.Dynamics):
         # disturbance: w
         x, v_x, v_y, delta = state
         return jnp.array([
+            [0.],
             [v_y],
             [-v_x - self.C/self.m * (self.l_f*jnp.cos(delta) - self.l_r)/clip_mag(v_x, e)],
             [0.]
@@ -194,7 +195,7 @@ class X_vx_vy_d(dynamics.Dynamics):
         control_direction = grad_value @ self.control_jacobian(state, time)
         if self.control_mode == "min":
             control_direction = -control_direction
-        disturbance_direction = grad_value[1:] @ self.affine_disturbance_jacobian(state, time)
+        disturbance_direction = grad_value @ self.affine_disturbance_jacobian(state, time)
         if self.disturbance_mode == "min":
             disturbance_direction = -disturbance_direction
 
@@ -303,6 +304,7 @@ class Y_vx_vy_d(dynamics.Dynamics):
         # disturbance: w
         x, v_x, v_y, delta = state
         return jnp.array([
+            [0.],
             [v_y],
             [-v_x - self.C/self.m * (self.l_f*jnp.cos(delta) - self.l_r)/clip_mag(v_x, e)],
             [0.]
@@ -323,7 +325,7 @@ class Y_vx_vy_d(dynamics.Dynamics):
         control_direction = grad_value @ self.control_jacobian(state, time)
         if self.control_mode == "min":
             control_direction = -control_direction
-        disturbance_direction = grad_value[1:] @ self.affine_disturbance_jacobian(state, time)
+        disturbance_direction = grad_value @ self.affine_disturbance_jacobian(state, time)
         if self.disturbance_mode == "min":
             disturbance_direction = -disturbance_direction
 
@@ -375,8 +377,8 @@ class X_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
         if max_disturbances is None:
             max_disturbances = [0] * 3
 
-        control_space = sets.Box(jnp.array([0.]),
-                                 jnp.array([0.]))
+        control_space = sets.Box(jnp.array([0., 0.]),
+                                 jnp.array([0., 0.]))
         
         if disturbance_space is None:
             disturbance_space = sets.Box(jnp.array(min_disturbances),
@@ -405,8 +407,8 @@ class X_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
 
     def control_jacobian(self, state, time):
         return jnp.array([
-            [0.],
-            [0.]
+            [0., 0.],
+            [0., 0.],
         ])
 
     def disturbance_jacobian(self, state, time):
@@ -416,6 +418,9 @@ class X_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
             [jnp.cos(yaw), -jnp.sin(yaw), 0.],
             [0.,           0.,            1]
         ])
+    
+    def disturbance_dynamics(self, state, time, disturbance):
+        return self.disturbance_jacobian(state, time) @ disturbance
 
 
 class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
@@ -425,7 +430,6 @@ class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
                  max_disturbances=None,
                  control_mode="max",
                  disturbance_mode="min",
-                 control_space=None,
                  disturbance_space=None):
 
         if min_disturbances is None:
@@ -433,9 +437,8 @@ class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
         if max_disturbances is None:
             max_disturbances = [0] * 3
 
-        if control_space is None:
-            control_space = sets.Box(jnp.array([0.]),
-                                     jnp.array([0.]))
+        control_space = sets.Box(jnp.array([0., 0.]),
+                                 jnp.array([0., 0.]))
         
         if disturbance_space is None:
             disturbance_space = sets.Box(jnp.array(min_disturbances),
@@ -465,8 +468,8 @@ class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
     def control_jacobian(self, state, time):
         y, yaw = state
         return jnp.array([
-            [0.],
-            [0.]
+            [0., 0.],
+            [0., 0.],
         ])
 
     def disturbance_jacobian(self, state, time):
@@ -476,6 +479,9 @@ class Y_yaw(dynamics.ControlAndDisturbanceAffineDynamics):
             [jnp.sin(yaw), jnp.cos(yaw), 0.],
             [0.,           0.,           1.]
         ])
+
+    def disturbance_dynamics(self, state, time, disturbance):
+        return self.disturbance_jacobian(state, time) @ disturbance
 
 
 class vx_vy_w_d(dynamics.ControlAndDisturbanceAffineDynamics):
@@ -539,7 +545,7 @@ class vx_vy_w_d(dynamics.ControlAndDisturbanceAffineDynamics):
         ])
 
     def disturbance_jacobian(self, state, time):
-        return jnp.identity(4)
+        return jnp.zeros(4)
 
 
 class yaw_w_d(dynamics.Dynamics):

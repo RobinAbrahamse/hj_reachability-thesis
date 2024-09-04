@@ -1,5 +1,5 @@
 import hj_reachability as hj
-import hj_reachability.shapes as shp
+# import hj_reachability.shapes as shp
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -32,9 +32,8 @@ def spatial_deriv(grid, vf, ix):
             leftv = vf[ix_prv]
             rightv = vf[ix_nxt]
 
-        left_dx = (vf[ix] - leftv) / grid.spacings[axis]
-        right_dx = (rightv - vf[ix]) / grid.spacings[axis]
-        spatial_deriv.append((left_dx + right_dx) / 2)
+        axis_deriv = (rightv - leftv) / (2 * grid.spacings[axis])
+        spatial_deriv.append(axis_deriv)
     return np.array(spatial_deriv)
 
 def nearest_index(grid, x):
@@ -44,14 +43,15 @@ def nearest_index(grid, x):
     ix = np.where(ix >= grid.shape, np.array(grid.shape)-1, ix)
     return tuple(ix)
 
-def lrcs(dynamics, grid, dt, vf, x):
+def lrcs(dynamics, grid, dt, vf, x, disturbance=None):
     f = dynamics.open_loop_dynamics(x, None)
     g = dynamics.control_jacobian(x, None)
+    d = 0. if disturbance is None else dynamics.disturbance_dynamics(x, None, disturbance)
 
     ix = nearest_index(grid, x)
     dvdx = spatial_deriv(grid, vf, ix)
 
-    a = np.array(vf[tuple(ix)] + dt*(dvdx.T @ f))
+    a = np.array(vf[tuple(ix)] + dt*(dvdx.T @ (f + d)))
     b = np.array(dt*(dvdx.T @ g))
     return a, b
 

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 
 class Subsystem(object):
-    def __init__(self, dynamics, grid_mins, grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=None, solver_settings="low"):
+    def __init__(self, dynamics, grid_mins, grid_maxs, grid_res, time_step, target_mins, target_maxs, periodic_dims=None, solver_settings="high"):
         self.solver_settings = hj.SolverSettings.with_accuracy(solver_settings)
         self.dynamics = dynamics
         min_bounds = np.array(grid_mins)
