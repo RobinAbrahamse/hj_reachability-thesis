@@ -96,6 +96,7 @@ moc_vel_state_times = []
 moc_vel_state_x = []
 moc_vel_state_y = []
 moc_vel_state_yaw = []
+moc_acc_state_x = []
 idxs = [0,0]
 for i,t in enumerate(input_state_times):
     closest_value_inc(t, encoder_times_acc, idxs, 0)
@@ -106,11 +107,16 @@ for i,t in enumerate(input_state_times):
     moc_vel_state_x.append(moc_vel_x[idxs[1]])
     moc_vel_state_y.append(moc_vel_y[idxs[1]])
     moc_vel_state_yaw.append(moc_vel_yaw_ma[idxs[1]])
+    # moc_acc_state_x.append(moc_acc_x[idxs[1]])
+
 
 t_data = np.array(input_state_times.copy()) - input_state_times[0]
 y_data = np.array([moc_vel_state_x, moc_vel_state_y, moc_vel_state_yaw, encoder_state_vel])
 u_data = np.array([input_state_vel, input_state_steer])
 
+moc_acc_state_x = np.gradient(moc_vel_state_x, t_data)
+moc_acc_state_x = np.convolve(moc_acc_state_x, np.ones(3), 'same') / 3
+moc_acc_state_x[1:] = moc_acc_state_x[:-1]
 
 
 #### Model fitting
