@@ -26,11 +26,19 @@ class Subsystem(object):
     def step(self):
         result = self._compute_brs(self.solver_settings, self.dynamics, self.grid, self.result_list[-1], self.time_step)
         result = np.nan_to_num(result, copy=True, nan=np.inf)
+        if not np.isfinite(result).all():
+            print("WARNING: non-finite results")
         self.result_list.append(result)
         return result
     
     def combine(self):
         n = len(self.result_list)
+        result = np.copy(self.result_list[0])
+        for i in range(1, n):
+            result = np.minimum(result, self.result_list[i])
+        return result
+    
+    def combine_upto(self, n):
         result = np.copy(self.result_list[0])
         for i in range(1, n):
             result = np.minimum(result, self.result_list[i])
@@ -43,12 +51,15 @@ class Subsystem(object):
         if np.any(np.diff(negative_idxs) != 1):
             print("WARNING: range is not convex")
         if len(range) < 1:
-            print("WARNING: no safe range found")
-            return (0., 0.)
+            print("WARNING: no range found")
+            return None
         return (range[0], range[-1])
     
+    def add_target(self, target_mins, target_maxs):
+        target_sets = [shp.upper_half_space(self.grid, a, b) for a, b in target_mins] + [shp.lower_half_space(self.grid, a, b) for a, b in target_maxs]
+        target = shp.intersection(*target_sets)
+        self.result_list[0] = shp.union(self.result_list[0], target)
+
     def _compute_brs(self, solver_settings, dynamics, grid, target, t):
         values = hj.step(solver_settings, dynamics, grid, 0., target, -t)
         return np.asarray(values)
-
-
