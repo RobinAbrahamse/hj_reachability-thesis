@@ -1,6 +1,4 @@
 import jax.numpy as jnp
-# from scipy.optimize import minimize
-from jaxopt import ScipyBoundedMinimize
 
 from hj_reachability import dynamics
 from hj_reachability import sets

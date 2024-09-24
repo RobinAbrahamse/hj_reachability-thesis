@@ -9,22 +9,26 @@ from hj_tools import compute_brs
 avoid_dynamics = hj.systems.Bicycle7D(min_controls=[-26, -3.6],
                                       max_controls=[+26, +3.6]).with_mode('avoid')
 
-min_bounds = np.array([-6., -6., -np.pi/4, -10., -1., -np.pi/3, -np.pi/4])
-max_bounds = np.array([+6., +6., +np.pi/4, +10., +1., +np.pi/3, +np.pi/4])
-grid = hj.Grid.from_lattice_parameters_and_boundary_conditions(hj.sets.Box(min_bounds, max_bounds),
-                                                               (11, 11, 5, 7, 5, 5, 5))#,
-                                                            #    periodic_dims=2)
+grid_dims = np.array([22, 22, 12, 12, 9, 9, 7])
+grid_mins = np.array([-4., -4., 0.,      +0.1, -2., -np.pi, -np.pi/4])
+grid_maxs = np.array([+4., +4., 2*np.pi, +3.6, +2., +np.pi, +np.pi/4])
+grid = hj.Grid.from_lattice_parameters_and_boundary_conditions(hj.sets.Box(grid_mins, grid_maxs),
+                                                               grid_dims,
+                                                               periodic_dims=2)
 
 solver_settings = hj.SolverSettings.with_accuracy("low")
 t_step = .1
 
-target = shp.intersection(shp.lower_half_space(grid, 0, +6.),
-                          shp.upper_half_space(grid, 0, -6.),
-                          shp.lower_half_space(grid, 1, +2.),
-                          shp.upper_half_space(grid, 1, -2.),
-                          # shp.lower_half_space(grid, 2, np.pi/4. + 0.1),
-                          # shp.upper_half_space(grid, 2, -np.pi/4. - 0.1),
-                          shp.lower_half_space(grid, 3, 0.))
+target = shp.union(
+            shp.intersection(shp.lower_half_space(grid, 0, -.8),
+               shp.upper_half_space(grid, 0, +.8),
+               shp.lower_half_space(grid, 1, -.8),
+               shp.upper_half_space(grid, 3, 0.)),
+            shp.intersection(shp.lower_half_space(grid, 0, -.8),
+               shp.upper_half_space(grid, 0, +.8),
+               shp.upper_half_space(grid, 1, +.8),
+               shp.upper_half_space(grid, 3, 0.))
+         )
 
 result = compute_brs(solver_settings, avoid_dynamics, grid, target, t_step)
 print(result.shape)
