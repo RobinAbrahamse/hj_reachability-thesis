@@ -16,7 +16,7 @@ def back_project(grid_dims, subsys_value, subsys_idxs):
     pattern[subsys_idxs] = 1
     return np.tile(subsys_value[tuple(idxs)], pattern)
 
-def plot_set_3D(x, y, z, value, target, axes_titles=("x", "y", "z")):
+def plot_set_3D(x, y, z, value, target, axes_titles=("x", "y", "z"), opacity=[1., 0.75]):
     coords = np.array(list(product(x, y, z)))
     layout = go.Layout(
         scene = dict(
@@ -31,7 +31,8 @@ def plot_set_3D(x, y, z, value, target, axes_titles=("x", "y", "z")):
                                 y=coords[..., 1],
                                 z=coords[..., 2],
                                 value=value.ravel(),
-                                colorscale="jet",
+                                colorscale="blues",
+                                opacity=opacity[1],
                                 isomin=0,
                                 surface_count=1,
                                 isomax=0)
@@ -39,7 +40,8 @@ def plot_set_3D(x, y, z, value, target, axes_titles=("x", "y", "z")):
                                 y=coords[..., 1],
                                 z=coords[..., 2],
                                 value=target.ravel(),
-                                colorscale="reds",
+                                colorscale="magenta",
+                                opacity=opacity[0],
                                 isomin=0,
                                 surface_count=1,
                                 isomax=0)
@@ -72,8 +74,8 @@ class LRCS(object):
     def lrcs(self, inputs, vf, x, disturbance=None):
         n_in = len(inputs)
         input_mesh = np.meshgrid(*inputs)
-        a, b = self.linear_value_derivs(vf, x, disturbance)
-        control_set = a + sum([input_mesh[i]*b[i] for i in range(n_in)])
+        dvdt, dvdu = self.linear_value_derivs(vf, x, disturbance)
+        control_set = dvdt + sum([input_mesh[i]*dvdu[i] for i in range(n_in)])
         return control_set
 
     def linear_value_derivs(self, vf, x, disturbance):
@@ -83,10 +85,11 @@ class LRCS(object):
 
         ix = self.nearest_index(x)
         dvdx = self.spatial_deriv(vf, ix)
+        dvdx_dt = self.dt*dvdx.T
 
-        a = np.array(vf[tuple(ix)] + self.dt*(dvdx.T @ (f + d)))
-        b = np.array(self.dt*(dvdx.T @ g))
-        return a, b
+        dvdt = np.array(vf[tuple(ix)] + dvdx_dt @ (f + d))
+        dvdu = np.array(dvdx_dt @ g)
+        return dvdt, dvdu
 
     def nearest_index(self, x):
         x = np.array(x)
@@ -97,7 +100,6 @@ class LRCS(object):
             pos[axis] = pos[axis] % (self.shape[axis]) if axis in self.periodic_dims else pos[axis]
         ix = np.round(pos).astype(np.int32)
         ix = np.where(ix >= self.shape, np.array(self.shape)-1, ix)
-        print(ix)
         return tuple(ix)
 
     def spatial_deriv(self, vf, ix):

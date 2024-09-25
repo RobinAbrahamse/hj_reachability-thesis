@@ -16,6 +16,7 @@ max_controls = [+1.5, +16]
 # grid_dims = np.array([41, 41, 17, 21, 11, 11, 7])
 # grid_mins = np.array([-20., -20., 0.,      -10., -5., -np.pi/2, -np.pi/4])
 # grid_maxs = np.array([+20., +20., 2*np.pi, +10., +5., +np.pi/2, +np.pi/4])
+# grid_dims = np.array([32, 32, 22, 18, 14, 14, 9])
 grid_dims = np.array([22, 22, 12, 12, 9, 9, 7])
 grid_mins = np.array([-4., -4., 0.,      +0.1, -2., -np.pi, -np.pi/4])
 grid_maxs = np.array([+4., +4., 2*np.pi, +3.6, +2., +np.pi, +np.pi/4])
@@ -114,7 +115,6 @@ for i in range(n):
     print(f"Time step {i+1} completed (t={(i+1)*time_step})")
 print(f"Done in {process_time() - t0} seconds")
 
-
 print("Projecting and combining results...")
 t0 = process_time()
 value_function = np.tile([np.inf], grid_dims)
@@ -127,10 +127,6 @@ for i in range(n+1):
     value_function = np.minimum(value_function, vf_t)
 print(f"Done in {process_time() - t0} seconds")
 
-value_function_d = -shp.project_onto(-value_function, 0, 1, 2, 3, 4, 5)
-dynamics = hj.systems.Bicycle7D(min_controls=min_controls,
-                                max_controls=max_controls).with_mode('avoid')
-
 def vf(n):
     value_function = np.tile([np.inf], grid_dims)
     for i in range(n+1):
@@ -142,6 +138,14 @@ def vf(n):
         value_function = np.minimum(value_function, vf_t)
     return value_function
 
+def mem_footprint():
+    subsys_footprint = vx_vy_w_d.result_list[0].nbytes*len(vx_vy_w_d.result_list) + x_vx_vy_d.result_list[0].nbytes*len(x_vx_vy_d.result_list) + \
+                       y_vx_vy_d.result_list[0].nbytes*len(y_vx_vy_d.result_list) + x_yaw_w_d.result_list[0].nbytes*len(x_yaw_w_d.result_list) + \
+                       y_yaw_w_d.result_list[0].nbytes*len(y_yaw_w_d.result_list)
+    recon_footprint = value_function.nbytes
+    # recon_footprint = vx_vy_w_d.result_list[0][0,0,0,0].nbytes*np.prod(grid_dims)
+    print(f"subsystems: {subsys_footprint/1024} kB\n reconstruction: {recon_footprint/1024} kB\n reduction: {recon_footprint/subsys_footprint}")
+
 ### LEAST-RESTRICTIVE CONTROL SET
 def plot_combined_control_set(x):
     res = 50
@@ -151,24 +155,51 @@ def plot_combined_control_set(x):
     y_vx_vy_d_lrcs = hj_tools.LRCS(y_vx_vy_d.dynamics, time_step, *y_vx_vy_d.grid.coordinate_vectors)
     x_yaw_w_d_lrcs = hj_tools.LRCS(x_yaw_w_d.dynamics, time_step, *x_yaw_w_d.grid.coordinate_vectors, periodic_dims=[1])
     y_yaw_w_d_lrcs = hj_tools.LRCS(y_yaw_w_d.dynamics, time_step, *y_yaw_w_d.grid.coordinate_vectors, periodic_dims=[1])
+    vx_vy_w_d_lrcs.dynamics.open_loop_dynamics(x[vx_vy_w_d_idxs], None)
+    x_vx_vy_d_lrcs.dynamics.open_loop_dynamics(x[x_vx_vy_d_idxs], None)
+    y_vx_vy_d_lrcs.dynamics.open_loop_dynamics(x[y_vx_vy_d_idxs], None)
+    x_yaw_w_d_lrcs.dynamics.open_loop_dynamics(x[x_yaw_w_d_idxs], None)
+    y_yaw_w_d_lrcs.dynamics.open_loop_dynamics(x[y_yaw_w_d_idxs], None)
+    vx_vy_w_d_lrcs.dynamics.control_jacobian(x[vx_vy_w_d_idxs], None)
+    x_vx_vy_d_lrcs.dynamics.control_jacobian(x[x_vx_vy_d_idxs], None)
+    y_vx_vy_d_lrcs.dynamics.control_jacobian(x[y_vx_vy_d_idxs], None)
+    x_yaw_w_d_lrcs.dynamics.control_jacobian(x[x_yaw_w_d_idxs], None)
+    y_yaw_w_d_lrcs.dynamics.control_jacobian(x[y_yaw_w_d_idxs], None)
+    x_vx_vy_d_lrcs.dynamics.disturbance_dynamics(x[x_vx_vy_d_idxs], None, np.array([0,0]))
+    y_vx_vy_d_lrcs.dynamics.disturbance_dynamics(x[y_vx_vy_d_idxs], None, np.array([0,0]))
+    x_yaw_w_d_lrcs.dynamics.disturbance_dynamics(x[x_yaw_w_d_idxs], None, np.array([0,0]))
+    y_yaw_w_d_lrcs.dynamics.disturbance_dynamics(x[y_yaw_w_d_idxs], None, np.array([0,0]))
 
     control_set = np.tile([np.inf], (res, res))
+    cs_t = np.tile([-np.inf], (res, res))
+    t0 = process_time()
     for i in range(n+1):
+        t1 = process_time()
         cs_t = vx_vy_w_d_lrcs.lrcs(inputs, vx_vy_w_d.result_list[i], x[vx_vy_w_d_idxs])
+        print(f"subsys 1 LRCS in {process_time() - t1} seconds")
 
+        t1 = process_time()
         subsys_controls = x_vx_vy_d_lrcs.lrcs(inputs, x_vx_vy_d.result_list[i], x[x_vx_vy_d_idxs], disturbance=x[[2,5]])
+        print(f"subsys 2 LRCS in {process_time() - t1} seconds")
         cs_t = np.maximum(cs_t, subsys_controls)
 
+        t1 = process_time()
         subsys_controls = y_vx_vy_d_lrcs.lrcs(inputs, y_vx_vy_d.result_list[i], x[y_vx_vy_d_idxs], disturbance=x[[2,5]])
+        print(f"subsys 3 LRCS in {process_time() - t1} seconds")
         cs_t = np.maximum(cs_t, subsys_controls)
 
+        t1 = process_time()
         subsys_controls = x_yaw_w_d_lrcs.lrcs(inputs, x_yaw_w_d.result_list[i], x[x_yaw_w_d_idxs], disturbance=x[[3,4]])
+        print(f"subsys 4 LRCS in {process_time() - t1} seconds")
         cs_t = np.maximum(cs_t, subsys_controls)
 
+        t1 = process_time()
         subsys_controls = y_yaw_w_d_lrcs.lrcs(inputs, y_yaw_w_d.result_list[i], x[y_yaw_w_d_idxs], disturbance=x[[3,4]])
+        print(f"subsys 5 LRCS in {process_time() - t1} seconds")
         cs_t = np.maximum(cs_t, subsys_controls)
         control_set = np.minimum(control_set, cs_t)
     # control_set = (control_set >= 0)
+    print(f"Combined LRCS in {process_time() - t0} seconds")
 
     xs, ys = np.meshgrid(*inputs)
     plt.figure(figsize=(13, 8))
@@ -179,6 +210,8 @@ def plot_combined_control_set(x):
     return control_set
 
 def plot_reconstructed_control_set(x):
+    dynamics = hj.systems.Bicycle7D(min_controls=min_controls,
+                                    max_controls=max_controls).with_mode('avoid')
     full_lrcs = hj_tools.LRCS(dynamics, time_step, 
                               x_yaw_w_d.grid.coordinate_vectors[0],
                               y_yaw_w_d.grid.coordinate_vectors[0],
@@ -188,9 +221,13 @@ def plot_reconstructed_control_set(x):
                               vx_vy_w_d.grid.coordinate_vectors[2],
                               vx_vy_w_d.grid.coordinate_vectors[3], 
                               periodic_dims=[2])
+    dynamics.open_loop_dynamics(x, None)
+    dynamics.control_jacobian(x, None)
     res = 50
     inputs = [np.linspace(min_controls[0], max_controls[0], res), np.linspace(min_controls[1], max_controls[1], res)]
+    t0 = process_time()
     control_set = full_lrcs.lrcs(inputs, value_function, x)
+    print(f"reconstructed LRCS in {process_time() - t0} seconds")
     # control_set = (control_set >= 0)
 
     xs, ys = np.meshgrid(*inputs)
@@ -201,6 +238,8 @@ def plot_reconstructed_control_set(x):
     plt.ylabel('delta_dot')
     return control_set
 
+mem_footprint()
+breakpoint()
 x = np.array([-1.2, -2.8, 6., 1.8, 1.4, 0., 2.])
 # x = np.array([1.5, 2.1, 2.8, 1.2, 1., 0., 2.])
 plot_combined_control_set(x)
@@ -210,35 +249,35 @@ plt.colorbar()
 plt.show()
 breakpoint()
 
-def mem_footprint():
-    subsys_footprint = vx_vy_w_d.result_list[0].nbytes*len(vx_vy_w_d.result_list) + x_vx_vy_d.result_list[0].nbytes*len(x_vx_vy_d.result_list) + \
-                       y_vx_vy_d.result_list[0].nbytes*len(y_vx_vy_d.result_list) + x_yaw_w_d.result_list[0].nbytes*len(x_yaw_w_d.result_list) + \
-                       y_yaw_w_d.result_list[0].nbytes*len(y_yaw_w_d.result_list)
-    recon_footprint = value_function.nbytes
-    print(f"subsystems: {subsys_footprint/1024} kB\n reconstruction: {recon_footprint/1024} kB\n reduction: {recon_footprint/subsys_footprint}")
-
 ### PLOTTING
 # [22, 22, 12, 12, 9, 9, 7]
 [hj_tools.plot_set_3D(x_vx_vy_d.grid.coordinate_vectors[0], 
             y_vx_vy_d.grid.coordinate_vectors[0], 
             vx_vy_w_d.grid.coordinate_vectors[0], 
-            value_function_d[:,:,i,:,4,4],
-            vf(0)[:,:,i,:,4,4,0],
+            value_function[:,:,i,:,4,4,3],
+            vf(0)[:,:,i,:,4,4,3],
             ("x", "y", "v_x")) for i in [8,11]]
+
+hj_tools.plot_set_3D(x_vx_vy_d.grid.coordinate_vectors[0], 
+            y_vx_vy_d.grid.coordinate_vectors[0], 
+            vx_vy_w_d.grid.coordinate_vectors[0], 
+            value_function[:,:,11,:,4,4,3],
+            vf(0)[:,:,11,:,4,4,3],
+            ("x", "y", "v_x"), opacity=[0.99, 0.8])
 
 hj_tools.plot_set_3D(x_yaw_w_d.grid.coordinate_vectors[1]*180/np.pi, 
             vx_vy_w_d.grid.coordinate_vectors[0], 
             vx_vy_w_d.grid.coordinate_vectors[1], 
-            value_function_d[14,16,:,:,:,1],
-            vf(0)[14,16,:,:,:,1,0],
+            value_function[14,16,:,:,:,1,3],
+            vf(0)[14,16,:,:,:,1,3],
 #             value_function_d[10,9,:,:,:,1],
             ("yaw", "v_x", "v_y"))
 
 hj_tools.plot_set_3D(x_yaw_w_d.grid.coordinate_vectors[1]*180/np.pi, 
             vx_vy_w_d.grid.coordinate_vectors[0], 
             vx_vy_w_d.grid.coordinate_vectors[2], 
-            value_function_d[14,16,:,:,4,:],
-            vf(0)[14,16,:,:,4,:,0],
+            value_function[14,16,:,:,4,:,3],
+            vf(0)[14,16,:,:,4,:,3],
             ("yaw", "v_x", "w"))
 
 
