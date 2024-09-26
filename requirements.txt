@@ -1,0 +1,7 @@
+jax
+flax
+tqdm
+numpy=1.26.4
+plotly
+matplotlib
+
