@@ -249,6 +249,21 @@ plt.colorbar()
 plt.show()
 breakpoint()
 
+### ANIMATION
+# hj_tools.animation_images(x_vx_vy_d.grid.coordinate_vectors[0], 
+#             y_vx_vy_d.grid.coordinate_vectors[0], 
+#             vx_vy_w_d.grid.coordinate_vectors[0], 
+#             value_function[:,:,11,:,4,4,3],
+#             vf(0)[:,:,11,:,4,4,3],
+#             ("x", "y", "v_x"), 'anim_0yaw')
+# hj_tools.animation_images(x_vx_vy_d.grid.coordinate_vectors[0], 
+#             y_vx_vy_d.grid.coordinate_vectors[0], 
+#             vx_vy_w_d.grid.coordinate_vectors[0], 
+#             value_function[:,:,8,:,4,4,3],
+#             vf(0)[:,:,8,:,4,4,3],
+#             ("x", "y", "v_x"), 'anim_90yaw')
+# breakpoint()
+
 ### PLOTTING
 # [22, 22, 12, 12, 9, 9, 7]
 [hj_tools.plot_set_3D(x_vx_vy_d.grid.coordinate_vectors[0], 
@@ -256,14 +271,14 @@ breakpoint()
             vx_vy_w_d.grid.coordinate_vectors[0], 
             value_function[:,:,i,:,4,4,3],
             vf(0)[:,:,i,:,4,4,3],
-            ("x", "y", "v_x")) for i in [8,11]]
+            ("x", "y", "v_x")).show() for i in [8,11]]
 
 hj_tools.plot_set_3D(x_vx_vy_d.grid.coordinate_vectors[0], 
             y_vx_vy_d.grid.coordinate_vectors[0], 
             vx_vy_w_d.grid.coordinate_vectors[0], 
             value_function[:,:,11,:,4,4,3],
             vf(0)[:,:,11,:,4,4,3],
-            ("x", "y", "v_x"), opacity=[0.99, 0.8])
+            ("x", "y", "v_x")).show()
 
 hj_tools.plot_set_3D(x_yaw_w_d.grid.coordinate_vectors[1]*180/np.pi, 
             vx_vy_w_d.grid.coordinate_vectors[0], 
@@ -271,14 +286,14 @@ hj_tools.plot_set_3D(x_yaw_w_d.grid.coordinate_vectors[1]*180/np.pi,
             value_function[14,16,:,:,:,1,3],
             vf(0)[14,16,:,:,:,1,3],
 #             value_function_d[10,9,:,:,:,1],
-            ("yaw", "v_x", "v_y"))
+            ("yaw", "v_x", "v_y")).show()
 
 hj_tools.plot_set_3D(x_yaw_w_d.grid.coordinate_vectors[1]*180/np.pi, 
             vx_vy_w_d.grid.coordinate_vectors[0], 
             vx_vy_w_d.grid.coordinate_vectors[2], 
             value_function[14,16,:,:,4,:,3],
             vf(0)[14,16,:,:,4,:,3],
-            ("yaw", "v_x", "w"))
+            ("yaw", "v_x", "w")).show()
 
 
 
@@ -302,34 +317,34 @@ hj_tools.plot_set_3D(vx_vy_w_d.grid.coordinate_vectors[0],
             vx_vy_w_d.grid.coordinate_vectors[2], 
             vx_vy_w_d_res_proj,
             vx_vy_w_d.result_list[0][...,0],
-            ("v_x", "v_y", "w"))
+            ("v_x", "v_y", "w")).show()
 
 hj_tools.plot_set_3D(x_vx_vy_d.grid.coordinate_vectors[0], 
             x_vx_vy_d.grid.coordinate_vectors[1], 
             x_vx_vy_d.grid.coordinate_vectors[2], 
             x_vx_vy_d_res_proj,
             x_vx_vy_d.result_list[0][...,0],
-            ("x", "v_x", "v_y"))
+            ("x", "v_x", "v_y")).show()
 
 hj_tools.plot_set_3D(y_vx_vy_d.grid.coordinate_vectors[0], 
             y_vx_vy_d.grid.coordinate_vectors[1], 
             y_vx_vy_d.grid.coordinate_vectors[2], 
             y_vx_vy_d_res_proj,
             y_vx_vy_d.result_list[0][...,0],
-            ("y", "v_x", "v_y"))
+            ("y", "v_x", "v_y")).show()
 
 hj_tools.plot_set_3D(x_yaw_w_d.grid.coordinate_vectors[0], 
             x_yaw_w_d.grid.coordinate_vectors[1], 
             x_yaw_w_d.grid.coordinate_vectors[2], 
             x_yaw_w_d_res_proj,
             x_yaw_w_d.result_list[0][...,0],
-            ("x", "yaw", "w"))
+            ("x", "yaw", "w")).show()
 
 hj_tools.plot_set_3D(y_yaw_w_d.grid.coordinate_vectors[0], 
             y_yaw_w_d.grid.coordinate_vectors[1], 
             y_yaw_w_d.grid.coordinate_vectors[2], 
             y_yaw_w_d_res_proj,
             y_yaw_w_d.result_list[0][...,0],
-            ("y", "yaw", "w"))
+            ("y", "yaw", "w")).show()
 
 breakpoint()

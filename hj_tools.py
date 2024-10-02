@@ -16,23 +16,37 @@ def back_project(grid_dims, subsys_value, subsys_idxs):
     pattern[subsys_idxs] = 1
     return np.tile(subsys_value[tuple(idxs)], pattern)
 
-def plot_set_3D(x, y, z, value, target, axes_titles=("x", "y", "z"), opacity=[1., 0.75]):
-    coords = np.array(list(product(x, y, z)))
+def plot_set_3D(x, y, z, value, target, axes_titles=("x", "y", "z")):
+    coords = np.array(list(product(x, y, z)));
     layout = go.Layout(
+        margin = dict(l=0, r=0, t=0, b=0),
         scene = dict(
                     xaxis = dict(
                         title=axes_titles[0]),
                     yaxis = dict(
                         title=axes_titles[1]),
                     zaxis = dict(
-                        title=axes_titles[2]))
-    )
+                        title=axes_titles[2]),
+                    camera = dict(
+                        center=dict(
+                            x=0,
+                            y=0,
+                            z=-0.2
+                        ),
+                        eye=dict(
+                            x=2,
+                            y=0,
+                            z=1)
+                    )
+                )
+            )
     value_surface = go.Isosurface(x=coords[..., 0],
                                 y=coords[..., 1],
                                 z=coords[..., 2],
                                 value=value.ravel(),
-                                colorscale="blues",
-                                opacity=opacity[1],
+                                colorscale="oranges",
+                                opacity=0.75,
+                                showscale=False,
                                 isomin=0,
                                 surface_count=1,
                                 isomax=0)
@@ -40,15 +54,23 @@ def plot_set_3D(x, y, z, value, target, axes_titles=("x", "y", "z"), opacity=[1.
                                 y=coords[..., 1],
                                 z=coords[..., 2],
                                 value=target.ravel(),
-                                colorscale="magenta",
-                                opacity=opacity[0],
+                                colorscale="reds",
+                                showscale=False,
                                 isomin=0,
                                 surface_count=1,
                                 isomax=0)
     fig = go.Figure(data = target_surface, layout=layout)
     fig.add_trace(value_surface)
-    fig.show()
+    return fig
 
+def animation_images(x, y, z, val, tar, axes, folder_name='animations'):
+    fig = plot_set_3D(x, y, z, val,tar, axes)
+    layout = fig.layout
+    for i, a in enumerate(np.linspace(0.,2*np.pi,120)):
+        layout['scene']['camera']['eye']['x'] = 2*np.cos(a)
+        layout['scene']['camera']['eye']['y'] = 2*np.sin(a)
+        fig.update_layout(layout)
+        fig.write_image(f"{folder_name}/img{i}.png")
 
 def plot_value_2D(X, Y, V, axes_labels=None):
     plt.figure(figsize=(13, 8))
@@ -72,10 +94,9 @@ class LRCS(object):
         self.shape = [len(arr) for arr in self.grid_coords]
 
     def lrcs(self, inputs, vf, x, disturbance=None):
-        n_in = len(inputs)
-        input_mesh = np.meshgrid(*inputs)
         dvdt, dvdu = self.linear_value_derivs(vf, x, disturbance)
-        control_set = dvdt + sum([input_mesh[i]*dvdu[i] for i in range(n_in)])
+        input_mesh = np.meshgrid(*inputs)
+        control_set = dvdt + sum([input_mesh[i]*dvdu[i] for i in range(len(inputs))])
         return control_set
 
     def linear_value_derivs(self, vf, x, disturbance):
